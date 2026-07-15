@@ -3,46 +3,37 @@ import numpy as np
 from pylfsr import LFSR
 from fxpmath import Fxp
 
-#Variables and definitons 
-global seq_full
-getcontext().prec = 5
-x = Fxp(0, signed=True, n_word=16, n_frac=8)
 
-# Running LFSR
-state = [0,0,0,1,0]
-fpoly = [5,3]
-L = LFSR(fpoly=fpoly, initstate = state)
+# GLOBALS
 
-# Cycling and Converting to fxp
-str = ''
-for int i in range(10):
-    run_full()
+N_WORD = 16
+N_FRAC = 5
 
 
+state = [0,0,0,1,0,0,0,1]
+fpoly = [8,6,5,4]
+L = LFSR(fpoly=fpoly, initstate=state)
 
-print('full period')
-
-print(L.arr2str(seq_full))
-
-
-
-
-x.set_val(str)
-
-x.info(verbose = 3)
+# DEFINITIONS
+def run_LFSR(machine, n_bits = 8):
+    val = 0
+    for i in range(8):
+        machine.next()
+        val = (val << 1) | int(machine.outbit)
+    return val
+def Fxp_convert(value):
+    return Fxp(value, signed=True, n_word=N_WORD, n_frac=N_FRAC)
 
 
 
-'''
-LSFR into Binary Array
+NUM_SAMPLES = 10
+raw_samples = []
+fxp_samples = []
 
-Binary Array into Binary String
+for _ in range(NUM_SAMPLES):
+    sample = run_LFSR(L, n_bits=8)      # raw integer 0..255
+    raw_samples.append(sample)
+    fxp_samples.append(Fxp_convert(sample))
 
-String --> Fixed point
 
-'''
-
-def run_full():
-    seq_full = L.runFullPeriod()
-    for i in seq_full:
-        str += f'{seq_full[i]}'
+print("Fxp samples:", [f() for f in fxp_samples])

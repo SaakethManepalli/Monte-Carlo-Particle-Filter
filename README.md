@@ -22,15 +22,14 @@ The filter uses a **sequential, one-particle-per-cycle datapath** — a single s
 pipeline cycles through all 16 particles rather than replicating hardware 16 times,
 keeping the design small.
 
-| Stage | Function | ECE 316 content |
-|-------|----------|-----------------|
-| LFSR bank | Four independent 8-bit maximal-length LFSRs supplying noise | Shift registers, XOR feedback |
-| Particle register file | Sixteen 16-bit fixed-point registers holding particle positions | Register files |
-| Propagate | Adds summed-LFSR (approx. Gaussian) noise to each particle | Fixed-point adder datapath |
-| Weight | Rectangular likelihood: pass if `|z − x| < δ`, else fail | Subtractor + comparator |
-| Resample | Systematic resampling FSM (Accumulate / Select / Write) | Finite-state machine |
-| Estimator | Adder tree computing the particle mean | Adder tree |
-
+| Stage | Function 
+|-------|---------
+| LFSR bank | Four independent 8-bit maximal-length LFSRs supplying noise 
+| Particle register file | Sixteen 16-bit fixed-point registers holding particle positions 
+| Propagate | Adds summed-LFSR (approx. Gaussian) noise to each particle 
+| Weight | Rectangular likelihood: pass if `|z − x| < δ`, else fail 
+| Resample | Systematic resampling FSM (Accumulate / Select / Write) 
+| Estimator | Adder tree computing the particle mean 
 
 ## Repository structure
 

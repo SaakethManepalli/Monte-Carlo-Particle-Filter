@@ -24,7 +24,7 @@ def sat(x):
 
 def to_q105(x):
     """Float → Q10.5 raw integer. Round + saturate, exactly as a register would."""
-    return sat(round(x * SCALE))
+    return sat(int(x * SCALE)) #usese int so that it truncates, not banker's round
 
 def from_q105(fx):
     """Q10.5 raw integer → float. For printing and analysis only."""
@@ -37,6 +37,9 @@ def fx_add(a, b):
 def fx_sub(a, b):
     """Integer subtract with saturation (operates on raw Q10.5 ints)."""
     return sat(a - b)
+
+def propogate(particles, machine):
+    return [fx_add(p, noise_sample) for p in particles]
 
 # DEFINITIONS
 def run_LFSR(machine, n_bits = 8):
@@ -79,5 +82,7 @@ print(f"  mean: {mean:.2f}   (want ≈ 0)")
 print(f"  min:  {min(noise)}   max: {max(noise)}")
 
 # 3. show a few as human-readable floats
-print(f"\nFirst 5 noise as Q10.5 floats:")
-print(f"  {[from_q105(n) for n in noise[:5]]}") #n is our noise and what we add to particles
+print(f"\nNoise as Q10.5 floats:")
+print(f"  {[from_q105(n) for n in noise]}") #n is our noise and what we add to particles
+print(f"\n Noise + Sample:")
+print(f" {[from_q105(n) + sample for n in noise]})")

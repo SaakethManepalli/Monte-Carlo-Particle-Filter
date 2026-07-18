@@ -1,4 +1,3 @@
-numpy 
 pylfsr
 decimal
 fxpmath

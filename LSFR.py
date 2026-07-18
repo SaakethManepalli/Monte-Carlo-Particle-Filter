@@ -5,6 +5,7 @@ from fxpmath import Fxp
 
 
 # GLOBALS
+#
 
 N_WORD = 16
 N_FRAC = 5

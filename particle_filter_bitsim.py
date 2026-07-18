@@ -1,6 +1,6 @@
 import numpy as np
 
-# ─── Fixed-point config ────────────────────────────────────────────────
+# Fxp
 FRAC_BITS   = 8          # fractional bits
 SCALE       = 1 << FRAC_BITS          # 256
 INT_BITS    = 7          # integer bits (excl. sign)

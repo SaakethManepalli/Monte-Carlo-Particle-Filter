@@ -11,6 +11,7 @@ N_FRAC = 5
 SCALE  = 1 << N_FRAC              # 32 for Q10.5
 MAX_VAL = (1 << (N_WORD - 1)) - 1 #  32767
 MIN_VAL = -(1 << (N_WORD - 1))    # -32768
+M = 32
 
 
 state = [0,0,0,1,0,0,0,1]
@@ -39,7 +40,7 @@ def fx_sub(a, b):
     return sat(a - b)
 
 def propogate(particles, machine):
-    return [fx_add(p, noise_sample) for p in particles]
+    return [fx_add(p, noise_sample(machine)) for p in particles]
 
 # DEFINITIONS
 def run_LFSR(machine, n_bits = 8):
@@ -56,6 +57,18 @@ def noise_sample(machine):
     noise_float = (total - 510) / 256.0                      # center + scale, ~±2
     return to_q105(noise_float)                              # → Q10.5 raw int
 
+DELTA = to_q105(1.5)
+def weight(particles, z):
+    """
+    Rectangular likelihood: weight = 1 if |z - particle| <= DELTA, else 0.
+    z is the measurement in Q10.5. All arithmetic on raw integers.
+    Mirrors the Verilog weight module: subtractor + abs + comparator.
+    """
+    weights = []
+    for p in particles:
+        diff = abs(fx_sub(z, p))
+        weights.append(1 if diff <= DELTA else 0)
+    return weights
 
 
 
@@ -86,3 +99,16 @@ print(f"\nNoise as Q10.5 floats:")
 print(f"  {[from_q105(n) for n in noise]}") #n is our noise and what we add to particles
 print(f"\n Noise + Sample:")
 print(f" {[from_q105(n) + sample for n in noise]})")
+
+# ─── WEIGHT TEST ──────────────────────────────────────────────────────────────
+print("\n─── Weight test ───")
+test_particles = [to_q105(x) for x in [0.0, 1.0, 1.4, 1.6, 3.0, -1.0]]
+test_z = to_q105(1.5)     # measurement at 1.5
+
+w = weight(test_particles, test_z)
+
+print(f"DELTA = {from_q105(DELTA)}  (window is ±{from_q105(DELTA)})")
+print("particle | distance from z | weight")
+for p, wt in zip(test_particles, w):
+    dist = abs(from_q105(test_z) - from_q105(p))
+    print(f"  {from_q105(p):+5.2f}   |     {dist:.2f}       |   {wt}")

@@ -79,7 +79,7 @@ fxp_samples = []
 
 for _ in range(NUM_SAMPLES):
     sample = run_LFSR(L, n_bits=8)      # raw integer 0..255
-    raw_samples.append(sample)
+    raw_samples.append(sample) 
     fxp_samples.append(Fxp_convert(sample))
 
 

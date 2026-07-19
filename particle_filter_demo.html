@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>1D Particle Filter — Interactive Demo</title>
+<style>
+  :root {
+    --bg:        #0a0d10;
+    --panel:     #12161b;
+    --border:    #262d36;
+    --grid:      #1c232b;
+    --text:      #c9d1d9;
+    --dim:       #6e7681;
+    --accent:    #58a6ff;   /* particles   */
+    --true:      #3fb950;   /* true state  */
+    --meas:      #d29922;   /* measurement */
+    --est:       #f85149;   /* estimate    */
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    padding: 24px;
+    background: var(--bg);
+    color: var(--text);
+    font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  }
+
+  h1 {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text);
+    margin: 0 0 4px 0;
+  }
+
+  .subtitle {
+    color: var(--dim);
+    font-size: 12px;
+    margin-bottom: 18px;
+  }
+
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+  }
+
+  .panel-title {
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--dim);
+    margin: 0 0 10px 0;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 6px;
+  }
+
+  #canvasPanel { margin-bottom: 16px; }
+
+  canvas {
+    display: block;
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--grid);
+  }
+
+  .legend {
+    display: flex;
+    gap: 22px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+    font-size: 12px;
+  }
+
+  .legend-item { display: flex; align-items: center; gap: 6px; color: var(--dim); }
+
+  .swatch {
+    width: 10px;
+    height: 10px;
+    border-radius: 2px;
+    display: inline-block;
+  }
+
+  .grid3 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 16px;
+  }
+
+  @media (max-width: 900px) {
+    .grid3 { grid-template-columns: 1fr; }
+  }
+
+  button {
+    font-family: inherit;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    background: #161b22;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 7px 12px;
+    cursor: pointer;
+  }
+  button:hover  { border-color: var(--accent); }
+  button:active { background: #1c232b; }
+  button.active { border-color: var(--true); color: var(--true); }
+
+  .btn-row { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; }
+
+  .field { margin-bottom: 12px; }
+
+  .field label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--dim);
+    margin-bottom: 4px;
+  }
+
+  .field label span.val { color: var(--text); }
+
+  input[type="range"] {
+    width: 100%;
+    accent-color: var(--accent);
+  }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 7px 0;
+    border-bottom: 1px solid var(--grid);
+    font-size: 12px;
+  }
+  .stat-row:last-child { border-bottom: none; }
+  .stat-row .label { color: var(--dim); text-transform: uppercase; letter-spacing: 0.06em; }
+  .stat-row .value { color: var(--text); font-weight: 600; }
+</style>
+</head>
+<body>
+
+  <h1>1D Particle Filter</h1>
+  <div class="subtitle">sequential monte carlo — rectangular likelihood — systematic resampling</div>
+
+  <div class="panel" id="canvasPanel">
+    <canvas id="viewCanvas" width="1200" height="260"></canvas>
+    <div class="legend">
+      <div class="legend-item"><span class="swatch" style="background:var(--true)"></span> true state</div>
+      <div class="legend-item"><span class="swatch" style="background:var(--meas)"></span> measurement</div>
+      <div class="legend-item"><span class="swatch" style="background:var(--accent)"></span> particles</div>
+      <div class="legend-item"><span class="swatch" style="background:var(--est)"></span> estimate (mean)</div>
+    </div>
+  </div>
+
+  <div class="grid3">
+
+    <div class="panel">
+      <div class="panel-title">Playback</div>
+      <div class="btn-row">
+        <button id="btnPlay">Play</button>
+        <button id="btnStep">Step</button>
+        <button id="btnReset">Reset</button>
+      </div>
+      <div class="field">
+        <label>Speed <span class="val" id="speedVal"></span></label>
+        <input type="range" id="speedSlider" min="80" max="1500" step="10" value="500">
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Parameters</div>
+      <div class="field">
+        <label>Particles (M) <span class="val" id="mVal"></span></label>
+        <input type="range" id="mSlider" min="0" max="3" step="1" value="2">
+      </div>
+      <div class="field">
+        <label>Threshold (&delta;) <span class="val" id="deltaVal"></span></label>
+        <input type="range" id="deltaSlider" min="0.2" max="4" step="0.1" value="1.5">
+      </div>
+      <div class="field">
+        <label>Process noise (Q) <span class="val" id="qVal"></span></label>
+        <input type="range" id="qSlider" min="0.05" max="2" step="0.05" value="0.5">
+      </div>
+      <div class="field">
+        <label>Measurement noise (R) <span class="val" id="rVal"></span></label>
+        <input type="range" id="rSlider" min="0.1" max="3" step="0.1" value="1.0">
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Stats</div>
+      <div class="stat-row"><span class="label">Step</span><span class="value" id="statStep">0</span></div>
+      <div class="stat-row"><span class="label">MSE</span><span class="value" id="statMse">0.000</span></div>
+      <div class="stat-row"><span class="label">Survivors</span><span class="value" id="statSurvivors">0 / 0</span></div>
+      <div class="stat-row"><span class="label">N_eff = 1 / survivors</span><span class="value" id="statNeff">-</span></div>
+    </div>
+
+  </div>
+
+<script>
+"use strict";
+
+// ─────────────────────────────────────────────────────────────────────────
+// FILTER LOGIC
+// Each function below is one stage of the particle filter and is written to
+// correspond 1:1 with a stage of the Verilog pipeline (lfsr8 -> propagate ->
+// weight -> resample_fsm -> estimator). Read these top to bottom.
+// ─────────────────────────────────────────────────────────────────────────
+
+// Stand-in for the hardware LFSR noise bank: produces one Gaussian sample
+// via a Box-Muller transform. In hardware this is 4 LFSRs summed + rescaled;
+// here we just need *a* noise source with the same statistical role.
+function gaussianNoise(std) {
+  let u1 = Math.random();
+  while (u1 === 0) u1 = Math.random();   // avoid log(0)
+  const u2 = Math.random();
+  const z0 = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
+  return z0 * std;
+}
+
+// PROPAGATE: each particle independently drifts by one noise draw.
+// x_i[k] = x_i[k-1] + N(0, Q)   -- mirrors propagate.v adding LFSR noise.
+function propagate(particles, Q) {
+  return particles.map(p => p + gaussianNoise(Q));
+}
+
+// WEIGHT: rectangular likelihood. A particle "passes" (weight 1) if it's
+// within delta of the measurement, otherwise it "fails" (weight 0).
+// This binary pass/fail is exactly what weight.v computes as a comparator.
+function weight(particles, z, delta) {
+  return particles.map(p => (Math.abs(z - p) < delta) ? 1 : 0);
+}
+
+// RESAMPLE: systematic resampling specialized to binary (0/1) weights.
+// Mirrors the Accumulate / Select / Write states of resample_fsm.v:
+//   - Accumulate: figure out which particles passed (the "survivors").
+//   - Select+Write: refill all M particle slots from the survivor list,
+//     cycling through it starting at one random offset. This is the
+//     binary-weight equivalent of systematic resampling: every survivor
+//     is picked roughly M/n_survivors times, in a fixed round-robin order,
+//     using only one random draw for the whole step (not one per particle).
+function resample(particles, passFlags) {
+  const survivors = particles.filter((_, i) => passFlags[i] === 1);
+
+  // Zero-survivor edge case: nothing passed the likelihood test this step
+  // (measurement landed too far from every particle). There is nothing to
+  // resample from and no sensible way to refill the slots from an empty
+  // list, so -- matching the hardware FSM's n_pass == 0 fallback -- we skip
+  // resampling entirely and let the existing particle cloud carry over
+  // unchanged into the next step.
+  if (survivors.length === 0) {
+    return particles.slice();
+  }
+
+  const newParticles = new Array(particles.length);
+  const offset = Math.floor(Math.random() * survivors.length); // one random draw per step
+  for (let j = 0; j < particles.length; j++) {
+    newParticles[j] = survivors[(offset + j) % survivors.length];
+  }
+  return newParticles;
+}
+
+// ESTIMATE: sample mean of the particle cloud -- our best guess of the
+// hidden true state. Mirrors the adder-tree + shift-to-average in estimator.v.
+function estimate(particles) {
+  return particles.reduce((sum, p) => sum + p, 0) / particles.length;
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// SIMULATION STATE
+// ─────────────────────────────────────────────────────────────────────────
+
+const M_OPTIONS = [4, 8, 16, 32];
+
+const sim = {
+  M: M_OPTIONS[2],
+  delta: 1.5,
+  Q: 0.5,
+  R: 1.0,
+  xTrue: 0,
+  particles: [],
+  step: 0,
+  survivors: 0,
+  sumSqErr: 0,
+};
+
+function resetSim() {
+  sim.xTrue = 0;
+  sim.particles = new Array(sim.M).fill(0);
+  sim.step = 0;
+  sim.survivors = 0;
+  sim.sumSqErr = 0;
+  prev = snapshot();
+  curr = snapshot();
+  lastStepTime = performance.now();
+  updateStatsDisplay();
+}
+
+// One full filter step: advance the hidden world, then run the pipeline.
+function doStep() {
+  prev = curr;
+
+  sim.xTrue += gaussianNoise(sim.Q);
+  const z = sim.xTrue + gaussianNoise(sim.R);
+
+  sim.particles = propagate(sim.particles, sim.Q);
+  const passFlags = weight(sim.particles, z, sim.delta);
+  sim.particles = resample(sim.particles, passFlags);
+  const est = estimate(sim.particles);
+
+  sim.survivors = passFlags.reduce((a, b) => a + b, 0);
+  sim.step += 1;
+  sim.sumSqErr += (est - sim.xTrue) ** 2;
+
+  curr = snapshot(z, est);
+  lastStepTime = performance.now();
+  updateStatsDisplay();
+}
+
+function snapshot(z, est) {
+  return {
+    xTrue: sim.xTrue,
+    z: (z === undefined) ? sim.xTrue : z,
+    est: (est === undefined) ? estimate(sim.particles) : est,
+    particles: sim.particles.slice(),
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// RENDERING
+// ─────────────────────────────────────────────────────────────────────────
+
+const canvas = document.getElementById("viewCanvas");
+const ctx = canvas.getContext("2d");
+
+let prev = snapshot();
+let curr = snapshot();
+let lastStepTime = performance.now();
+let viewCenter = 0;
+
+function lerp(a, b, t) { return a + (b - a) * t; }
+
+function render() {
+  const W = canvas.width, H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  const stepDurationMs = Number(speedSlider.value);
+  const t = Math.min(1, (performance.now() - lastStepTime) / stepDurationMs);
+
+  const xTrue = lerp(prev.xTrue, curr.xTrue, t);
+  const z     = lerp(prev.z, curr.z, t);
+  const est   = lerp(prev.est, curr.est, t);
+  const particles = curr.particles.map((p, i) =>
+    lerp(prev.particles[i] !== undefined ? prev.particles[i] : p, p, t));
+
+  // view window: recenter smoothly on the true state, fixed half-width
+  viewCenter = lerp(viewCenter, xTrue, 0.08);
+  const halfWidth = 9;
+  const viewMin = viewCenter - halfWidth, viewMax = viewCenter + halfWidth;
+  const margin = 30;
+  const toPx = v => margin + (v - viewMin) / (viewMax - viewMin) * (W - 2 * margin);
+
+  // axis + ticks
+  const axisY = H * 0.62;
+  ctx.strokeStyle = "#1c232b";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(margin, axisY);
+  ctx.lineTo(W - margin, axisY);
+  ctx.stroke();
+
+  ctx.fillStyle = "#6e7681";
+  ctx.font = "11px ui-monospace, monospace";
+  ctx.textAlign = "center";
+  const tickStart = Math.ceil(viewMin);
+  for (let v = tickStart; v <= viewMax; v++) {
+    const x = toPx(v);
+    ctx.beginPath();
+    ctx.moveTo(x, axisY - 4);
+    ctx.lineTo(x, axisY + 4);
+    ctx.stroke();
+    if (v % 2 === 0) ctx.fillText(String(v), x, axisY + 18);
+  }
+
+  // particle cloud: small translucent dots, slightly fanned out vertically
+  ctx.fillStyle = "rgba(88, 166, 255, 0.55)";
+  particles.forEach((p, i) => {
+    const x = toPx(p);
+    const y = axisY - 14 - (i % 5) * 6;
+    ctx.beginPath();
+    ctx.arc(x, y, 3.2, 0, Math.PI * 2);
+    ctx.fill();
+  });
+
+  // measurement: amber diamond
+  drawDiamond(toPx(z), axisY, 7, "#d29922");
+
+  // true state: green vertical marker
+  drawMarker(toPx(xTrue), axisY, "#3fb950");
+
+  // estimate: red vertical marker, drawn slightly offset so it doesn't hide the true marker
+  drawMarker(toPx(est), axisY, "#f85149", true);
+
+  requestAnimationFrame(render);
+}
+
+function drawMarker(x, axisY, color, dashed) {
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.5;
+  if (dashed) ctx.setLineDash([4, 3]); else ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(x, axisY - 60);
+  ctx.lineTo(x, axisY + 26);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawDiamond(x, axisY, r, color) {
+  const y = axisY - 40;
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(x, y - r);
+  ctx.lineTo(x + r, y);
+  ctx.lineTo(x, y + r);
+  ctx.lineTo(x - r, y);
+  ctx.closePath();
+  ctx.fill();
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// UI WIRING
+// ─────────────────────────────────────────────────────────────────────────
+
+const btnPlay  = document.getElementById("btnPlay");
+const btnStep  = document.getElementById("btnStep");
+const btnReset = document.getElementById("btnReset");
+const speedSlider = document.getElementById("speedSlider");
+const mSlider     = document.getElementById("mSlider");
+const deltaSlider = document.getElementById("deltaSlider");
+const qSlider     = document.getElementById("qSlider");
+const rSlider     = document.getElementById("rSlider");
+
+let playing = false;
+let playTimer = null;
+
+function setPlaying(on) {
+  playing = on;
+  btnPlay.textContent = playing ? "Pause" : "Play";
+  btnPlay.classList.toggle("active", playing);
+  if (playTimer) { clearInterval(playTimer); playTimer = null; }
+  if (playing) {
+    playTimer = setInterval(doStep, Number(speedSlider.value));
+  }
+}
+
+btnPlay.addEventListener("click", () => setPlaying(!playing));
+btnStep.addEventListener("click", () => { setPlaying(false); doStep(); });
+btnReset.addEventListener("click", () => { setPlaying(false); resetSim(); });
+
+speedSlider.addEventListener("input", () => {
+  speedVal.textContent = speedSlider.value + " ms/step";
+  if (playing) setPlaying(true); // restart interval at new speed
+});
+
+mSlider.addEventListener("input", () => {
+  sim.M = M_OPTIONS[Number(mSlider.value)];
+  mVal.textContent = sim.M;
+  setPlaying(false);
+  resetSim(); // particle array length changed -- clean restart
+});
+
+deltaSlider.addEventListener("input", () => {
+  sim.delta = Number(deltaSlider.value);
+  deltaVal.textContent = sim.delta.toFixed(1);
+});
+
+qSlider.addEventListener("input", () => {
+  sim.Q = Number(qSlider.value);
+  qVal.textContent = sim.Q.toFixed(2);
+});
+
+rSlider.addEventListener("input", () => {
+  sim.R = Number(rSlider.value);
+  rVal.textContent = sim.R.toFixed(2);
+});
+
+function updateStatsDisplay() {
+  statStep.textContent = sim.step;
+  const mse = sim.step > 0 ? sim.sumSqErr / sim.step : 0;
+  statMse.textContent = mse.toFixed(3);
+  statSurvivors.textContent = `${sim.survivors} / ${sim.M}`;
+  statNeff.textContent = sim.survivors > 0 ? (1 / sim.survivors).toFixed(3) : "-";
+}
+
+// initial control values
+speedVal.textContent  = speedSlider.value + " ms/step";
+mVal.textContent       = sim.M;
+deltaVal.textContent   = sim.delta.toFixed(1);
+qVal.textContent       = sim.Q.toFixed(2);
+rVal.textContent       = sim.R.toFixed(2);
+
+resetSim();
+requestAnimationFrame(render);
+</script>
+</body>
+</html>

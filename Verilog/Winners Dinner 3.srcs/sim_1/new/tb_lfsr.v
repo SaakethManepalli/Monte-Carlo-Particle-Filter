@@ -1,4 +1,4 @@
-
+//AI Generated, lfsr_tb is the one given to us by the winners dinner doc
 // ─── tb_lfsr.v ─────────────────────────────────────────────────────────────
 // Diffs lfsr_byte_gen output, byte-by-byte, against lfsr_golden.hex
 // (exported directly from the Python/pylfsr reference model).

@@ -204,3 +204,78 @@ if __name__ == "__main__":
     print(f"KF MSE:          {mse(kf_estimates, true_states):.4f}")
     if zero_steps:
         print(f"\nZero-survivor steps: {zero_steps}")
+
+
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+def generate_mse_graph():
+    # Target steps and particle counts requested
+    steps_list = [50, 100, 150, 200]
+    m_list = [4, 8, 16, 32]
+    
+    pf_mse_results = {m: [] for m in m_list}
+    kf_mse_results = []
+    
+    # We must declare these global so the estimator() function picks up the changes
+    global M, GROWTH 
+    
+    print("Simulating data for graph...")
+    
+    for steps in steps_list:
+        # 1. Generate the trajectory for the current step count
+        true_states, measurements = generate_trajectory(steps, seed=42)
+        
+        # 2. Run Kalman Filter (Baseline)
+        kf_estimates, _ = kalman_filter(measurements)
+        kf_mse_results.append(mse(kf_estimates, true_states))
+        
+        # 3. Run Particle Filter for each M
+        for m in m_list:
+            M = m
+            GROWTH = int(np.log2(m)) # Update the arithmetic shift for the new M
+            
+            # Setup PF variables manually since run_particle_filter() uses fixed M
+            delta_fixed = to_fixed(1.5)
+            machine = make_lfsr()
+            particles = [0] * M 
+            estimates = np.empty(steps)
+            
+            # Run the PF steps
+            for k in range(steps):
+                z_fixed = to_fixed(measurements[k])
+                particles = [propagate(p, noise_sample(machine)) for p in particles]
+                pass_flags = [weight(z_fixed, p, delta_fixed) for p in particles]
+                particles, _ = resample(pass_flags, particles)
+                estimates[k] = to_float(estimator(particles))
+                
+            # Calculate and store PF MSE
+            pf_mse_results[m].append(mse(estimates, true_states))
+
+    # --- Plotting the Graph ---
+    plt.figure(figsize=(10, 6))
+    
+    # Plot Particle Filter lines
+    colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
+    for idx, m in enumerate(m_list):
+        plt.plot(steps_list, pf_mse_results[m], marker='o', color=colors[idx], label=f'PF (M={m})')
+        
+    # Plot Kalman Filter line
+    plt.plot(steps_list, kf_mse_results, marker='s', color='black', linestyle='--', linewidth=2, label='Kalman Filter')
+    
+    # Formatting
+    plt.title('Filter Mean Squared Error (MSE) vs. Time Steps')
+    plt.xlabel('Number of Steps')
+    plt.ylabel('Mean Squared Error (MSE)')
+    plt.xticks(steps_list)
+    plt.grid(True, linestyle=':', alpha=0.7)
+    plt.legend()
+    
+    # Display the graph
+    plt.tight_layout()
+    plt.show()
+
+# Replace the existing if __name__ == "__main__": block with this to run the graph
+if __name__ == "__main__":
+    generate_mse_graph()

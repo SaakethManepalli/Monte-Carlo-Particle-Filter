@@ -187,7 +187,7 @@ def run_particle_filter(n_steps, delta_float=1.5, seed=0):
 
 
 if __name__ == "__main__":
-    N_STEPS = 300
+    N_STEPS = 500
 
     true_states, measurements, pf_estimates, zero_steps = run_particle_filter(N_STEPS, seed=0)
     kf_estimates, _ = kalman_filter(measurements)
@@ -212,7 +212,7 @@ import numpy as np
 
 def generate_mse_graph():
     # Target steps and particle counts requested
-    steps_list = [50, 100, 150, 200]
+    steps_list = [50, 100, 150, 200, 250, 300, 350, 400, 450, 500]
     m_list = [4, 8, 16, 32]
     
     pf_mse_results = {m: [] for m in m_list}

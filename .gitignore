@@ -216,5 +216,5 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
-.csv
-.DS_store
+*.csv
+*.DS_store
